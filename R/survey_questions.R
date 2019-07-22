@@ -15,6 +15,8 @@ getSurveyQuestions <- function(...) {
 #'
 #' @param surveyID A string. Unique ID for the survey you want to download.
 #' Returned as `id` by the \link[qualtRics]{all_surveys} function.
+#' @param subquestion Logical. If \code{TRUE} then the table will include
+#' the subquestions to the survey as well as the questions.
 #'
 #' @seealso See \url{https://api.qualtrics.com/docs} for documentation on the
 #' Qualtrics API.
@@ -42,7 +44,7 @@ getSurveyQuestions <- function(...) {
 #' )
 #' }
 #'
-survey_questions <- function(surveyID) {
+survey_questions <- function(surveyID, subquestion = FALSE) {
 
   # Check params
   assert_base_url()
@@ -72,6 +74,26 @@ survey_questions <- function(surveyID) {
     qname = purrr::map_chr(qi, "questionName"),
     question = purrr::map_chr(qi, "questionText"),
     force_resp = purrr::map_lgl(qi, ~ .$validation$doesForceResponse))
+
+  # Subquestions in the same format as questions
+  if (subquestion) {
+    subquest <- lapply(
+      names(qi),
+      function(x) {
+        qix <- qi[[x]]
+        if (!"subQuestions" %in% names(qix)) return(NULL)
+
+        tibble::tibble(
+          qid = paste(x, names(qix$subQuestions), sep = "-"),
+          qname = paste0(qix$questionName, "_", qix$questionName, ".", purrr::map(qix$subQuestions, "recode")),
+          question = purrr::map_chr(qix$subQuestions, "choiceText"),
+          force_resp = qix$validation$doesForceResponse
+        )
+      }
+    )
+
+    quest <- bind_rows(quest, subquest)
+  }
 
   return(quest)
 }
